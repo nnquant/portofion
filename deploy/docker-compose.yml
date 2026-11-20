@@ -1,0 +1,47 @@
+name: portofion
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: portofion
+      POSTGRES_USER: portofion
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portofion}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portofion -d portofion"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: portofion:local
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      PORTOFION_DATABASE_URL: postgresql+psycopg://portofion:${POSTGRES_PASSWORD:-portofion}@db:5432/portofion
+    ports:
+      - "${PORTOFION_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  # nightly pg_dump into deploy/backups (enable with: docker compose --profile backup up -d)
+  # old dumps are kept; prune deploy/backups yourself
+  backup:
+    profiles: ["backup"]
+    image: postgres:16-alpine
+    depends_on: [db]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-portofion}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["sh", "-c", "while true; do pg_dump -h db -U portofion -Fc portofion > /backups/portofion-$$(date +%F).dump; sleep 86400; done"]
+    restart: unless-stopped
+
+volumes:
+  db:

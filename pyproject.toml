@@ -1,0 +1,53 @@
+[project]
+name = "portofion"
+version = "0.1.0"
+description = "Multi-strategy performance tracking platform"
+requires-python = ">=3.12"
+dependencies = [
+    "portofion-engine",
+    "portofion-server",
+    "portofion-client",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["engine", "server", "client"]
+
+[tool.uv.sources]
+portofion-engine = { workspace = true }
+portofion-server = { workspace = true }
+portofion-client = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "httpx>=0.27",
+    "testcontainers[postgres]>=4.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["web", "server/src/portofion_server/migrations/versions"]
+
+# the agent skill script and the SDK run on agents' machines
+[tool.ruff.per-file-target-version]
+"server/src/portofion_server/agent_docs/**/*.py" = "py38"
+"client/**/*.py" = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "NPY"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "B008", "SIM108"]
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests", "server/tests", "client/tests"]
+markers = ["perf: performance tests (deselected by default)"]
+addopts = "-m 'not perf' -q"
+filterwarnings = ["ignore::DeprecationWarning:testcontainers.*"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["portofion_engine", "portofion_server", "portofion_client"]
