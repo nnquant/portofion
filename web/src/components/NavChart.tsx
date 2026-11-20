@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { AXIS_FONT, catAxis, drawdownFrom, navFrom, pctFmt, tooltip, valAxis } from "../lib/chart";
+import { AXIS_FONT, catAxis, drawdownFrom, extentOf, linAxisFit, logAxisFit, navFmt, navFmtFor, navFrom, pctFmt, tooltip, valAxis } from "../lib/chart";
+import type { Palette } from "../lib/colors";
 import { useWs } from "../lib/ctx";
 import type { Num } from "../lib/types";
 import { EChart, type ECharts } from "./EChart";
@@ -51,7 +52,39 @@ function rebased(s: NavSeries, from: number): { nav: Num[]; dd: Num[] } {
   return { nav, dd: drawdownFrom(nav) };
 }
 
-export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras = [], extraHeight = 64, markers = [], toolbar, initialStart, group }: Props) {
+/** NAV axis fitted to the curves in the visible window: 1-2-5 steps when linear, fitted marks when log. */
+function navAxis(p: Palette, log: boolean, navs: Num[][], from: number, to: number) {
+  const [lo, hi] = extentOf(navs, from, to);
+  if (!log) {
+    const { min, max, interval } = linAxisFit(lo, hi);
+    const fmt = navFmtFor(interval);
+    return valAxis(p, 0, fmt, { scale: false, min, max, interval });
+  }
+  const { min, max, ticks } = logAxisFit(lo, hi);
+  return valAxis(p, 0, navFmt, {
+    type: "log",
+    logBase: 10,
+    scale: false,
+    min,
+    max,
+    axisLabel: { color: p.muted, fontSize: AXIS_FONT, formatter: navFmt, customValues: ticks },
+    axisTick: { show: false, customValues: ticks },
+  });
+}
+
+/** Small panels: three labels at most; bars (summed flows) keep their zero baseline. */
+function extraAxis(p: Palette, e: ExtraPanel, i: number) {
+  return valAxis(p, i + 2, e.fmt ?? ((v: number) => String(+v.toPrecision(3))), {
+    splitNumber: 2,
+    scale: !e.bar,
+    name: e.name,
+    nameLocation: "end",
+    nameGap: 8,
+    nameTextStyle: { color: p.ink2, fontSize: AXIS_FONT, align: "left", padding: [0, 0, 0, -44] },
+  });
+}
+
+export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras = [], extraHeight = 76, markers = [], toolbar, initialStart, group }: Props) {
   const { palette: p } = useWs();
   const [log, setLog] = useState(false);
   const chartRef = useRef<ECharts | null>(null);
@@ -63,8 +96,12 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
     const i = dates.findIndex((d) => d >= initialStart);
     return i > 0 ? i : 0;
   }, [dates, initialStart]);
+  // visible window as category indexes; kept across Linear/Log and overlay changes, reset with new dates
+  const win = useRef({ from: from0, to: dates.length - 1, dates });
+  if (win.current.dates !== dates) win.current = { from: from0, to: dates.length - 1, dates };
 
   const option = useMemo(() => {
+    const { from, to } = win.current;
     const grids: object[] = [];
     let top = PAD_TOP;
     grids.push({ left: 52, right, top, height: navHeight });
@@ -78,20 +115,14 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
     }
     const nGrid = grids.length;
     const xAxes = grids.map((_, i) => catAxis(p, dates, i, i === nGrid - 1));
+    const curves = series.map((s) => rebased(s, from));
     const yAxes: object[] = [
-      valAxis(p, 0, (v) => v.toFixed(2), log ? { type: "log", logBase: 10 } : {}),
+      navAxis(p, log, curves.map((c) => c.nav), from, to),
       valAxis(p, 1, pctFmt(0), { scale: false, max: 0 }),
-      ...extras.map((e, i) =>
-        valAxis(p, i + 2, e.fmt ?? ((v: number) => String(+v.toPrecision(3))), {
-          name: e.name,
-          nameLocation: "end",
-          nameGap: 6,
-          nameTextStyle: { color: p.ink2, fontSize: AXIS_FONT, align: "left", padding: [0, 0, 0, -44] },
-        }),
-      ),
+      ...extras.map((e, i) => extraAxis(p, e, i)),
     ];
-    const navSeries = series.map((s) => {
-      const { nav } = rebased(s, from0);
+    const navSeries = series.map((s, si) => {
+      const { nav } = curves[si];
       return {
         id: `nav:${s.key}`,
         type: "line",
@@ -117,8 +148,8 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
             : undefined,
       };
     });
-    const ddSeries = series.map((s) => {
-      const { dd } = rebased(s, from0);
+    const ddSeries = series.map((s, si) => {
+      const { dd } = curves[si];
       return {
         id: `dd:${s.key}`,
         type: "line",
@@ -163,7 +194,8 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
       xAxis: xAxes,
       yAxis: yAxes,
       axisPointer: { link: [{ xAxisIndex: "all" }] },
-      dataZoom: [{ type: "inside", xAxisIndex: grids.map((_, i) => i), filterMode: "none", minValueSpan: 10, startValue: from0 }],
+      // "filter" so every panel's y range fits the zoomed window
+      dataZoom: [{ type: "inside", xAxisIndex: grids.map((_, i) => i), filterMode: "filter", minValueSpan: 10, startValue: from, endValue: to }],
       tooltip: tooltip(p, (params: any[]) => {
         if (!params?.length) return "";
         const ax = params[0].axisIndex ?? params[0].componentIndex;
@@ -191,15 +223,17 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
     const opt = chart.getOption() as any;
     const dz = opt.dataZoom?.[0];
     const from = Math.max(0, Math.floor(dz?.startValue ?? 0));
+    const to = Math.min(dates.length - 1, Math.ceil(dz?.endValue ?? dates.length - 1));
+    win.current = { from, to, dates };
+    const curves = series.map((s) => rebased(s, from));
     chart.setOption(
       {
-        series: series.flatMap((s) => {
-          const { nav, dd } = rebased(s, from);
-          return [
-            { id: `nav:${s.key}`, data: nav },
-            { id: `dd:${s.key}`, data: dd },
-          ];
-        }),
+        series: series.flatMap((s, si) => [
+          { id: `nav:${s.key}`, data: curves[si].nav },
+          { id: `dd:${s.key}`, data: curves[si].dd },
+        ]),
+        // the NAV axis has an explicit range, so refit it to what is now visible
+        yAxis: [navAxis(p, log, curves.map((c) => c.nav), from, to)],
       },
       { lazyUpdate: true },
     );

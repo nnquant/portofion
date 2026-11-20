@@ -7,7 +7,7 @@ import { NavChart } from "../components/NavChart";
 import { RefPicker } from "../components/RefPicker";
 import { DrawdownTable, MetricsTable, MonthlyHeatmap } from "../components/tables";
 import { api, ApiError, ws as wsPath } from "../lib/api";
-import { catAxis, line, pctFmt, tooltip, valAxis } from "../lib/chart";
+import { catAxis, legend, line, navFmt, pctFmt, tooltip, valAxis } from "../lib/chart";
 import { useSlots } from "../lib/colors";
 import { useWs } from "../lib/ctx";
 import { pct, sign } from "../lib/format";
@@ -129,14 +129,15 @@ export function PortfolioPage() {
       return { ...line(ref, w.series[k], c), stack: "w", areaStyle: { color: c, opacity: 0.7 }, lineStyle: { width: 0 }, step: "end" };
     });
     const cashMax = Math.max(...(w.series.cash ?? []).map((x) => Math.abs(x ?? 0)));
+    const gross = Math.max(...w.dates.map((_, t) => ks.reduce((a, k) => a + Math.max(0, w.series[k][t] ?? 0), 0)));
     if (cashMax > 1e-6) series.push({ ...line("cash", w.series.cash, p.grid), stack: "w", areaStyle: { color: p.grid, opacity: 1 }, lineStyle: { width: 0 }, step: "end" });
     return {
       animation: false,
       grid: { left: 44, right: 12, top: 26, bottom: 22 },
-      legend: { top: 0, left: 40, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: p.ink2, fontSize: 11 } },
+      legend: legend(p),
       xAxis: catAxis(p, w.dates),
-      yAxis: valAxis(p, 0, pctFmt(0), { scale: false, max: (v: { max: number }) => (v.max <= 1.0001 ? 1 : undefined) }),
-      dataZoom: [{ type: "inside", filterMode: "none" }],
+      yAxis: valAxis(p, 0, pctFmt(0), gross <= 1.0001 ? { scale: false, min: 0, max: 1, interval: 0.25 } : { scale: false, splitNumber: 4 }),
+      dataZoom: [{ type: "inside", filterMode: "filter" }],
       tooltip: tooltip(p, (ps: any[]) =>
         `<div style="color:${p.muted}">${ps[0]?.axisValue ?? ""}</div>` +
         ps.map((x) => `<div style="display:flex;gap:10px;justify-content:space-between"><span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${x.color};margin-right:6px"></span>${x.seriesName}</span><b>${pct(x.value, 1)}</b></div>`).join(""),
@@ -158,10 +159,10 @@ export function PortfolioPage() {
     return {
       animation: false,
       grid: { left: 44, right: 12, top: 26, bottom: 22 },
-      legend: { top: 0, left: 40, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: p.ink2, fontSize: 11 } },
+      legend: legend(p),
       xAxis: catAxis(p, md.dates),
-      yAxis: valAxis(p, 0, (v: number) => v.toFixed(2)),
-      dataZoom: [{ type: "inside", filterMode: "none" }],
+      yAxis: valAxis(p, 0, navFmt, { splitNumber: 4 }),
+      dataZoom: [{ type: "inside", filterMode: "filter" }],
       tooltip: tooltip(p, (ps: any[]) =>
         `<div style="color:${p.muted}">${ps[0]?.axisValue ?? ""}</div>` +
         ps.filter((x) => x.value != null).map((x) => `<div style="display:flex;gap:10px;justify-content:space-between"><span><span style="display:inline-block;width:10px;height:3px;border-radius:2px;background:${x.color};vertical-align:middle;margin-right:6px"></span>${x.seriesName}</span><b>${Number(x.value).toFixed(3)}</b></div>`).join(""),

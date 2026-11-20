@@ -4,6 +4,7 @@ import {
   DataZoomComponent,
   GridComponent,
   LegendComponent,
+  LegendScrollComponent,
   MarkLineComponent,
   TooltipComponent,
 } from "echarts/components";
@@ -20,6 +21,7 @@ echarts.use([
   GridComponent,
   TooltipComponent,
   LegendComponent,
+  LegendScrollComponent,
   DataZoomComponent,
   MarkLineComponent,
   AxisPointerComponent,

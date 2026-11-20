@@ -7,7 +7,7 @@ import { NavChart, type NavSeries } from "../components/NavChart";
 import { RefPicker } from "../components/RefPicker";
 import { CorrMatrix, MetricsTable } from "../components/tables";
 import { api, qs, ws as wsPath } from "../lib/api";
-import { catAxis, line, tooltip, valAxis } from "../lib/chart";
+import { catAxis, ffillInside, line, tooltip, valAxis } from "../lib/chart";
 import { slotVar, useSlots } from "../lib/colors";
 import { useWs } from "../lib/ctx";
 import type { CompareData, Num } from "../lib/types";
@@ -71,7 +71,10 @@ export function Compare() {
     if (!d) return null;
     const ppy = Math.max(...Object.values(d.periods));
     const sh = d.keys.map((k) => line(k, rollingSharpe(d.returns[k], 126, d.periods[k] ?? ppy), color(k)));
-    const rc = d.keys.slice(1).map((k) => ({ ...line(k, d.rolling_corr[k] ?? [], color(k)), xAxisIndex: 1, yAxisIndex: 1 }));
+    // on a mixed calendar (crypto 7d vs equities 5d) correlations only exist on shared days; carry them
+    // over the rest so the lines do not break into dots
+    const rc = d.keys.slice(1).map((k) => ({ ...line(k, ffillInside(d.rolling_corr[k] ?? []), color(k)), xAxisIndex: 1, yAxisIndex: 1 }));
+    const axisName = { nameTextStyle: { color: p.ink2, align: "left", padding: [0, 0, 0, -36] }, nameGap: 6 };
     return {
       animation: false,
       grid: [
@@ -80,11 +83,19 @@ export function Compare() {
       ],
       xAxis: [catAxis(p, d.dates, 0, false), catAxis(p, d.dates, 1, true)],
       yAxis: [
-        valAxis(p, 0, (v: number) => v.toFixed(1), { name: "Sharpe 126d", nameTextStyle: { color: p.ink2, align: "left", padding: [0, 0, 0, -36] }, nameGap: 4 }),
-        valAxis(p, 1, (v: number) => v.toFixed(1), { min: -1, max: 1, scale: false, name: d.keys.length > 1 ? `Corr 63d vs ${d.keys[0]}` : "", nameTextStyle: { color: p.ink2, align: "left", padding: [0, 0, 0, -36] }, nameGap: 4 }),
+        valAxis(p, 0, (v: number) => v.toFixed(1), { name: "Sharpe 126d", ...axisName }),
+        // fit the observed correlations (always showing 0) instead of pinning ±1, which flattens typical ±0.3 values
+        valAxis(p, 1, (v: number) => v.toFixed(1), {
+          scale: false,
+          splitNumber: 4,
+          min: (v: { min: number }) => Math.max(-1, Math.floor(Math.min(v.min, 0) * 5) / 5),
+          max: (v: { max: number }) => Math.min(1, Math.ceil(Math.max(v.max, 0) * 5) / 5),
+          name: d.keys.length > 1 ? `Corr 63d vs ${d.keys[0]}` : "",
+          ...axisName,
+        }),
       ],
       axisPointer: { link: [{ xAxisIndex: "all" }] },
-      dataZoom: [{ type: "inside", xAxisIndex: [0, 1], filterMode: "none", startValue: Math.max(0, d.dates.findIndex((x) => x >= (d.common_start ?? ""))) }],
+      dataZoom: [{ type: "inside", xAxisIndex: [0, 1], filterMode: "filter", startValue: Math.max(0, d.dates.findIndex((x) => x >= (d.common_start ?? ""))) }],
       tooltip: tooltip(p, (ps: any[]) => {
         if (!ps?.length) return "";
         return (
