@@ -120,7 +120,7 @@ export function StrategyPage() {
             <span className="truncate text-[14px] font-semibold" title={d.strategy.name}>
               {d.strategy.slug}
             </span>
-            {d.strategy.kind === "benchmark" && <span className="text-muted">benchmark</span>}
+            {d.strategy.archived ? <span className="text-muted">archived</span> : d.strategy.kind === "benchmark" && <span className="text-muted">benchmark</span>}
           </div>
           {d.strategy.name !== d.strategy.slug && <div className="truncate text-ink2">{d.strategy.name}</div>}
           {d.strategy.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{d.strategy.tags.map((t) => <Link key={t} to="/w/$ws" params={{ ws }} search={{ tag: t }} className="tag" data-c={d.strategy.tag_colors[t] ?? undefined}>{t}</Link>)}</div>}
@@ -497,17 +497,27 @@ function Manage({ d, branch, v, isAdmin, onChange }: { d: StrategyDetail; branch
   const patchB = (body: object) => run(() => api(wsPath(ws, `/strategies/${s}/branches/${encodeURIComponent(branch.name)}`), { method: "PATCH", body }));
   const patchV = (body: object) => run(() => api(wsPath(ws, `/versions/${v.id}`), { method: "PATCH", body }));
   const row = "grid grid-cols-[120px_1fr] items-center gap-2";
+  // fields save on blur; Enter commits too
+  const commitOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => e.key === "Enter" && e.currentTarget.blur();
+  const saveTags = () => {
+    const next = [...new Set(tags.split(/[,，、;；]/).map((t) => t.trim()).filter(Boolean))];
+    setTags(next.join(", "));
+    if ([...next].sort().join() !== [...d.strategy.tags].sort().join()) patchS({ tags: next });
+  };
+  // archiving hides it from the Library, so ask first; unarchiving does not
+  const archive = (what: string, archived: boolean, patch: (b: object) => unknown) =>
+    (archived || confirm(`Archive ${what}? It will be hidden from the Library.`)) && patch({ archived: !archived });
   return (
     <div className="grid max-w-[1100px] gap-3 lg:grid-cols-3">
       <div className="card flex flex-col gap-2 p-3">
         <div className="font-semibold">{d.strategy.slug}</div>
         <div className={row}>
           <span className="text-ink2">Name</span>
-          <input className="ctl" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name !== d.strategy.name && patchS({ name })} />
+          <input className="ctl" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={commitOnEnter} onBlur={() => name !== d.strategy.name && patchS({ name })} />
         </div>
         <div className={row}>
           <span className="text-ink2">Tags</span>
-          <input className="ctl" value={tags} onChange={(e) => setTags(e.target.value)} onBlur={() => patchS({ tags: tags.split(",").map((t) => t.trim()).filter(Boolean) })} />
+          <input className="ctl" value={tags} onChange={(e) => setTags(e.target.value)} onKeyDown={commitOnEnter} onBlur={saveTags} />
         </div>
         <div className={row}>
           <span className="text-ink2">Periods / year</span>
@@ -535,7 +545,7 @@ function Manage({ d, branch, v, isAdmin, onChange }: { d: StrategyDetail; branch
           </select>
         </div>
         <div className="flex gap-2 pt-1">
-          <button className="btn" onClick={() => patchS({ archived: !d.strategy.archived })}>
+          <button className="btn" onClick={() => archive(d.strategy.slug, d.strategy.archived, patchS)}>
             {d.strategy.archived ? "Unarchive" : "Archive"}
           </button>
           {isAdmin && (
@@ -569,7 +579,7 @@ function Manage({ d, branch, v, isAdmin, onChange }: { d: StrategyDetail; branch
           <input type="checkbox" className="justify-self-start" checked={branch.head_locked} onChange={(e) => patchB({ head_locked: e.target.checked })} />
         </label>
         <div className="flex gap-2 pt-1">
-          <button className="btn" onClick={() => patchB({ archived: !branch.archived })}>
+          <button className="btn" onClick={() => archive(`${d.strategy.slug}/${branch.name}`, branch.archived, patchB)}>
             {branch.archived ? "Unarchive" : "Archive"}
           </button>
         </div>
@@ -602,7 +612,7 @@ function Manage({ d, branch, v, isAdmin, onChange }: { d: StrategyDetail; branch
               Make head
             </button>
           )}
-          <button className="btn" onClick={() => patchV({ archived: !v.archived })}>
+          <button className="btn" onClick={() => archive(`${d.strategy.slug}/${branch.name}@${v.label}`, v.archived, patchV)}>
             {v.archived ? "Unarchive" : "Archive"}
           </button>
           {isAdmin && (

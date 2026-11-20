@@ -115,8 +115,8 @@ export function Library() {
   const searchBox = useRef<HTMLInputElement>(null);
 
   const lib = useQuery({
-    queryKey: ["library", slug, level, window_],
-    queryFn: () => api<LibraryData>(wsPath(slug, `/library${qs({ level, window: window_ })}`)),
+    queryKey: ["library", slug, level, window_, !!search.arch],
+    queryFn: () => api<LibraryData>(wsPath(slug, `/library${qs({ level, window: window_, archived: search.arch ? true : undefined })}`)),
   });
 
   const set = (patch: Partial<LibSearch>) => nav({ search: (s: LibSearch) => ({ ...s, ...patch }), replace: true });
@@ -250,6 +250,9 @@ export function Library() {
         <button className="btn" aria-pressed={!!search.bench} style={search.bench ? { background: "var(--sel)", color: "var(--series-1)" } : undefined} onClick={() => set({ bench: search.bench ? undefined : "1" })}>
           Benchmarks
         </button>
+        <button className="btn" aria-pressed={!!search.arch} style={search.arch ? { background: "var(--sel)", color: "var(--series-1)" } : undefined} onClick={() => set({ arch: search.arch ? undefined : "1" })}>
+          Archived
+        </button>
         <Popover button={<button className="btn">Columns</button>}>
           {allCols
             .filter((c) => c.id !== "strategy" && c.id !== "spark")
@@ -325,7 +328,7 @@ export function Library() {
                           to="/w/$ws/s/$slug"
                           params={{ ws: slug, slug: r.strategy }}
                           search={{ b: r.branch, v: r.version }}
-                          className={`hover:text-accent hover:underline ${r.kind === "benchmark" ? "text-ink2 italic" : ""}`}
+                          className={`hover:text-accent hover:underline ${r.kind === "benchmark" ? "text-ink2 italic" : ""} ${r.archived ? "text-muted line-through" : ""}`}
                           title={r.name}
                         >
                           {r.strategy}

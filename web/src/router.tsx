@@ -31,6 +31,7 @@ export interface LibSearch {
   level?: string;
   sort?: string;
   bench?: string;
+  arch?: string;
 }
 export const libraryRoute = createRoute({
   getParentRoute: () => wsRoute,
@@ -43,6 +44,7 @@ export const libraryRoute = createRoute({
     level: str(s.level),
     sort: str(s.sort),
     bench: str(s.bench),
+    arch: str(s.arch),
   }),
   component: Library,
 });
