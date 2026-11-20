@@ -303,3 +303,71 @@ textarea {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+
+/* Library tree: caret on branch rows, elbow lines on the version rows under them */
+.caret {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.caret:hover {
+  color: var(--text-primary);
+  background: var(--hover);
+}
+.caret svg {
+  transition: transform 0.12s;
+}
+.caret[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.caret-gap {
+  display: inline-block;
+  width: 18px;
+}
+.tbl td.tree-cell {
+  position: relative;
+}
+.tree-stem,
+.tree-elbow::before,
+.tree-elbow::after {
+  position: absolute;
+  border-color: var(--edge);
+  border-style: solid;
+  border-width: 0;
+}
+.tree-stem {
+  left: 12.5px;
+  top: 19px;
+  bottom: -1px;
+  border-left-width: 1px;
+}
+.tree-elbow::before {
+  content: "";
+  left: 12.5px;
+  top: 0;
+  bottom: -1px;
+  border-left-width: 1px;
+}
+.tree-elbow.last::before {
+  bottom: 50%;
+}
+.tree-elbow::after {
+  content: "";
+  left: 12.5px;
+  top: 50%;
+  width: 13px;
+  border-top-width: 1px;
+}
+/* expanded version rows sit on a slightly recessed band */
+.tbl tr.sub {
+  background: color-mix(in srgb, var(--plane) 85%, var(--surface-1));
+}

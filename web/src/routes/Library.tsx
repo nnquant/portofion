@@ -27,7 +27,7 @@ const sgn = (fmtF: (v: number | null) => string, get: (r: LibRow) => number | nu
 };
 
 const COLS: Col[] = [
-  { id: "strategy", label: "Strategy", get: (r) => r.strategy, asc: true, width: 200 },
+  { id: "strategy", label: "Strategy", get: (r) => r.strategy, asc: true, width: 240 },
   { id: "branch", label: "Branch", get: (r) => r.branch, asc: true, width: 110 },
   { id: "version", label: "Version", get: (r) => r.seq, asc: false, width: 70 },
   { id: "vers", label: "Vers", get: (r) => r.n_versions, num: true, width: 44 },
@@ -89,6 +89,26 @@ const COLS: Col[] = [
   { id: "reported", label: "Reported", get: (r) => r.last_report_at, width: 64, num: true, render: (r) => <span className="text-ink2">{ago(r.last_report_at)}</span> },
 ];
 
+// On expanded version rows these identify the parent row and stay empty; the version label sits in the tree column.
+const BRANCH_LEVEL = new Set(["strategy", "branch", "version", "tags", "vers"]);
+
+function Caret({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button
+      className="caret"
+      aria-expanded={open}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      <svg width="8" height="8" viewBox="0 0 8 8">
+        <path d="M2.5 1 L6 4 L2.5 7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
 const DEFAULT_COLS = ["strategy", "branch", "version", "stage", "tags", "spark", "last", "ann_ret", "ann_vol", "sharpe", "max_dd", "calmar", "ret_mtd", "ret_ytd", "flags"];
 const ROW_H = 24;
 
@@ -118,6 +138,31 @@ export function Library() {
     queryKey: ["library", slug, level, window_, !!search.arch],
     queryFn: () => api<LibraryData>(wsPath(slug, `/library${qs({ level, window: window_, archived: search.arch ? true : undefined })}`)),
   });
+
+  // Branch rows show the head; expanding a branch lists its other versions underneath.
+  const tree = level === "branch";
+  const bkey = (r: LibRow) => `${slug}:${r.strategy}/${r.branch}`;
+  const [open, setOpen] = useLocalState<string[]>("pfn.lib.open", []);
+  const openSet = useMemo(() => new Set(open), [open]);
+  const verLib = useQuery({
+    queryKey: ["library", slug, "version", window_, !!search.arch],
+    queryFn: () => api<LibraryData>(wsPath(slug, `/library${qs({ level: "version", window: window_, archived: search.arch ? true : undefined })}`)),
+    enabled: tree && open.some((k) => k.startsWith(`${slug}:`)),
+  });
+  const others = useMemo(() => {
+    const m = new Map<string, LibRow[]>();
+    for (const r of verLib.data?.rows ?? []) {
+      if (r.is_head) continue;
+      const k = bkey(r);
+      const list = m.get(k);
+      if (list) list.push(r);
+      else m.set(k, [r]);
+    }
+    return m; // newest version first, as the server orders them
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verLib.data]);
+  const hasOthers = (r: LibRow) => (verLib.data ? (others.get(bkey(r))?.length ?? 0) > 0 : r.n_versions > 1);
+  const toggleOpen = (k: string) => setOpen((o) => (o.includes(k) ? o.filter((x) => x !== k) : [...o, k]));
 
   const set = (patch: Partial<LibSearch>) => nav({ search: (s: LibSearch) => ({ ...s, ...patch }), replace: true });
   useEffect(() => {
@@ -172,11 +217,28 @@ export function Library() {
     return r;
   }, [lib.data, search.bench, search.tag, search.stage, search.q, sortId, sortDir, allCols]);
 
-  const scroller = useRef<HTMLDivElement>(null);
-  const v = useVirtualizer({ count: rows.length, getScrollElement: () => scroller.current, estimateSize: () => ROW_H, overscan: 20 });
+  const display = useMemo(() => {
+    const out: { r: LibRow; child: boolean; last?: boolean }[] = [];
+    for (const r of rows) {
+      out.push({ r, child: false });
+      if (!tree || !openSet.has(bkey(r))) continue;
+      const kids = others.get(bkey(r)) ?? [];
+      kids.forEach((k, i) => out.push({ r: k, child: true, last: i === kids.length - 1 }));
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, tree, openSet, others]);
+  const anyOpen = tree && rows.some((r) => openSet.has(bkey(r)));
+  const toggleAll = () => {
+    const mine = new Set(rows.map(bkey));
+    setOpen((o) => (anyOpen ? o.filter((k) => !mine.has(k)) : [...new Set([...o, ...rows.filter(hasOthers).map(bkey)])]));
+  };
 
-  const selRows = rows.filter((r) => selected.has(r.version_id));
-  const refOf = (r: LibRow) => (level === "branch" ? `${r.strategy}/${r.branch}` : `${r.strategy}/${r.branch}@${r.version}`);
+  const scroller = useRef<HTMLDivElement>(null);
+  const v = useVirtualizer({ count: display.length, getScrollElement: () => scroller.current, estimateSize: () => ROW_H, overscan: 20 });
+
+  const selRows = display.filter((d) => selected.has(d.r.version_id));
+  const refOf = ({ r, child }: { r: LibRow; child: boolean }) => (tree && !child ? `${r.strategy}/${r.branch}` : `${r.strategy}/${r.branch}@${r.version}`);
   const compare = () => {
     if (!selRows.length) return;
     nav({ to: "/w/$ws/compare", params: { ws: slug }, search: { refs: selRows.slice(0, 8).map(refOf).join(",") } });
@@ -211,11 +273,11 @@ export function Library() {
     lastClicked.current = idx;
     setSelected((prev) => {
       const s = new Set(prev);
-      const id = rows[idx].version_id;
+      const id = display[idx].r.version_id;
       if (shift && anchor !== null) {
         const [a, b] = [Math.min(anchor, idx), Math.max(anchor, idx)];
         const on = !s.has(id);
-        for (let i = a; i <= b; i++) on ? s.add(rows[i].version_id) : s.delete(rows[i].version_id);
+        for (let i = a; i <= b; i++) on ? s.add(display[i].r.version_id) : s.delete(display[i].r.version_id);
       } else if (s.has(id)) s.delete(id);
       else s.add(id);
       return s;
@@ -227,7 +289,7 @@ export function Library() {
   const items = v.getVirtualItems();
   const padTop = items.length ? items[0].start : 0;
   const padBottom = items.length ? v.getTotalSize() - items[items.length - 1].end : 0;
-  const allSel = rows.length > 0 && rows.every((r) => selected.has(r.version_id));
+  const allSel = display.length > 0 && display.every((d) => selected.has(d.r.version_id));
 
   return (
     <div className="flex h-full flex-col">
@@ -297,10 +359,11 @@ export function Library() {
           <thead>
             <tr>
               <th>
-                <input type="checkbox" checked={allSel} onChange={() => setSelected(allSel ? new Set() : new Set(rows.map((r) => r.version_id)))} />
+                <input type="checkbox" checked={allSel} onChange={() => setSelected(allSel ? new Set() : new Set(display.map((d) => d.r.version_id)))} />
               </th>
               {cols.map((c) => (
                 <th key={c.id} className={`${c.num ? "num" : ""} ${c.id !== "spark" ? "cursor-pointer hover:text-ink" : ""}`} onClick={() => toggleSort(c)}>
+                  {c.id === "strategy" && tree && <Caret open={anyOpen} onClick={toggleAll} />}
                   {c.label}
                   {sortId === c.id ? (sortDir === "desc" ? " ↓" : " ↑") : ""}
                 </th>
@@ -314,16 +377,39 @@ export function Library() {
               </tr>
             )}
             {items.map((it) => {
-              const r = rows[it.index];
+              const { r, child, last } = display[it.index];
               const isSel = selected.has(r.version_id);
+              const k = bkey(r);
               return (
-                <tr key={r.version_id} style={isSel ? { background: "var(--sel)" } : undefined}>
+                <tr key={r.version_id} className={child ? "sub" : undefined} style={isSel ? { background: "var(--sel)" } : undefined}>
                   <td onClick={(e) => toggleRow(it.index, e.shiftKey)} className="cursor-pointer">
                     <input type="checkbox" checked={isSel} readOnly className="pointer-events-none" />
                   </td>
                   {cols.map((c) => (
-                    <td key={c.id} className={`${c.num ? "num" : ""} overflow-hidden text-ellipsis`}>
-                      {c.id === "strategy" ? (
+                    <td key={c.id} className={`${c.num ? "num" : ""} overflow-hidden text-ellipsis ${c.id === "strategy" && tree ? "tree-cell" : ""}`}>
+                      {child && BRANCH_LEVEL.has(c.id) ? (
+                        c.id === "strategy" ? (
+                          <>
+                            <span className={`tree-elbow ${last ? "last" : ""}`} />
+                            {/* strategy/branch/version; the strategy repeats the row above, so it is grey and gives way first */}
+                            <Link
+                              to="/w/$ws/s/$slug"
+                              params={{ ws: slug, slug: r.strategy }}
+                              search={{ b: r.branch, v: r.version }}
+                              className="ml-[26px] inline-flex max-w-[calc(100%-26px)] align-bottom hover:text-accent hover:underline"
+                            >
+                              <span className="min-w-0 truncate text-muted">{r.strategy}</span>
+                              <span className="flex-none text-muted">/</span>
+                              <span className="flex-none">
+                                {r.branch}/{r.version}
+                              </span>
+                            </Link>
+                          </>
+                        ) : null
+                      ) : c.id === "strategy" ? (
+                        <>
+                        {tree && (hasOthers(r) ? <Caret open={openSet.has(k)} onClick={() => toggleOpen(k)} /> : <span className="caret-gap" />)}
+                        {tree && openSet.has(k) && hasOthers(r) && <span className="tree-stem" />}
                         <Link
                           to="/w/$ws/s/$slug"
                           params={{ ws: slug, slug: r.strategy }}
@@ -333,13 +419,14 @@ export function Library() {
                         >
                           {r.strategy}
                         </Link>
+                        </>
                       ) : c.id === "branch" ? (
                         <span className={r.is_default ? "" : "text-ink2"}>{r.branch}</span>
                       ) : c.id === "version" ? (
                         <span>
                           {r.version}
                           {r.is_head && level === "version" ? <span className="ml-1 text-accent">●</span> : null}
-                          {r.head_locked && level === "branch" ? <span className="ml-1 text-muted" title="head locked">🔒</span> : null}
+                          {r.head_locked && tree && !child ? <span className="ml-1 text-muted" title="head locked">🔒</span> : null}
                         </span>
                       ) : c.id === "spark" ? (
                         <Spark data={r.spark} />

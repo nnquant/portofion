@@ -24,7 +24,7 @@ export function useSearchRefs(q: string) {
   });
 }
 
-export function useLocalState<T>(key: string, initial: T | (() => T)): [T, (v: T) => void] {
+export function useLocalState<T>(key: string, initial: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void] {
   const [v, setV] = useState<T>(() => {
     const init = () => (typeof initial === "function" ? (initial as () => T)() : initial);
     try {
@@ -34,13 +34,15 @@ export function useLocalState<T>(key: string, initial: T | (() => T)): [T, (v: T
       return init();
     }
   });
-  const set = (x: T) => {
-    setV(x);
-    try {
-      localStorage.setItem(key, JSON.stringify(x));
-    } catch {
-      /* ignore */
-    }
-  };
+  const set = (x: T | ((prev: T) => T)) =>
+    setV((prev) => {
+      const next = typeof x === "function" ? (x as (prev: T) => T)(prev) : x;
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   return [v, set];
 }
