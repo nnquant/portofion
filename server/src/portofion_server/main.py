@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import mimetypes
 import threading
 from contextlib import asynccontextmanager
 from importlib.resources import files
@@ -17,6 +18,9 @@ from portofion_server import skillpack
 from portofion_server.api.v1 import agent, auth, workspace
 from portofion_server.errors import ApiError, install_handlers
 from portofion_server.settings import get_settings, public_base
+
+# not in the stdlib table; the web UI self-hosts its font
+mimetypes.add_type("font/woff2", ".woff2")
 
 PKG_DIR = Path(str(files("portofion_server")))
 REPO_ROOT = PKG_DIR.parents[2]

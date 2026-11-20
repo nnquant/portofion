@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ErrorLine, Seg } from "../components/bits";
+import { CopyButton, ErrorLine, Seg } from "../components/bits";
 import { api, ws as wsPath } from "../lib/api";
 import { useWs } from "../lib/ctx";
 import { ago, pct } from "../lib/format";
@@ -128,18 +128,14 @@ Then use the skill. Without skill support, read ${base}/llms.txt and use:
         <div className="card flex flex-col gap-2 border-accent p-3" style={{ borderColor: "var(--series-1)" }}>
           <div className="flex items-center gap-2">
             <code className="flex-1 select-all rounded bg-hover px-2 py-1 font-mono text-[12px]">{created.key}</code>
-            <button className="btn" onClick={() => navigator.clipboard.writeText(created.key)}>
-              Copy key
-            </button>
+            <CopyButton text={created.key} label="Copy key" />
           </div>
           <div>
             <Seg value={via} options={[["sh", "macOS / Linux"], ["ps1", "Windows"], ["prompt", "Prompt"]]} onChange={setVia} />
           </div>
           <pre className="select-all whitespace-pre-wrap break-all rounded bg-hover p-2 font-mono text-[11.5px] text-ink">{snippet}</pre>
           <div className="flex gap-2">
-            <button className="btn btn-primary" onClick={() => navigator.clipboard.writeText(snippet)}>
-              Copy
-            </button>
+            <CopyButton text={snippet} className="btn btn-primary" />
             <button className="btn" onClick={() => setCreated(null)}>
               Done
             </button>
@@ -229,9 +225,7 @@ function Members() {
           {link && (
             <>
               <code className="select-all rounded bg-hover px-2 py-1 font-mono text-[11.5px]">{link}</code>
-              <button className="btn" onClick={() => navigator.clipboard.writeText(link)}>
-                Copy
-              </button>
+              <CopyButton text={link} />
             </>
           )}
           <ErrorLine error={err} />

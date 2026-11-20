@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { copyText } from "../lib/clipboard";
 import { sign } from "../lib/format";
 import type { Num, Stage } from "../lib/types";
 
@@ -41,6 +42,31 @@ export function StageDot({ stage, withLabel = true }: { stage: Stage; withLabel?
 
 export function Signed({ v, children }: { v: Num | undefined; children: React.ReactNode }) {
   return <span className={sign(v)}>{children}</span>;
+}
+
+export function CopyButton({ text, label = "Copy", className = "btn" }: { text: string; label?: string; className?: string }) {
+  const [state, setState] = useState<"ok" | "fail" | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const click = async () => {
+    const ok = await copyText(text);
+    setState(ok ? "ok" : "fail");
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setState(null), 1500);
+  };
+  // all three labels share one grid cell so the button keeps its width
+  const cell = (s: typeof state, t: string) => (
+    <span style={{ gridArea: "1 / 1" }} className={state === s ? "" : "invisible"}>
+      {t}
+    </span>
+  );
+  return (
+    <button className={`${className} inline-grid place-items-center`} onClick={click}>
+      {cell(null, label)}
+      {cell("ok", "Copied")}
+      {cell("fail", "Ctrl+C")}
+    </button>
+  );
 }
 
 export function Seg<T extends string>({ value, options, onChange }: { value: T; options: (T | [T, string])[]; onChange: (v: T) => void }) {

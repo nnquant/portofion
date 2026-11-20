@@ -48,7 +48,7 @@ const COLS: Col[] = [
       </span>
     ),
   },
-  { id: "spark", label: "", get: () => null, width: 92 },
+  { id: "spark", label: "", get: () => null, width: 96 },
   { id: "start", label: "Start", get: (r) => r.m.first_date, asc: true, width: 84, num: true },
   {
     id: "last",

@@ -11,6 +11,7 @@ import * as echarts from "echarts/core";
 import type { EChartsCoreOption } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef } from "react";
+import { CHART_FONT } from "../lib/chart";
 
 echarts.use([
   LineChart,
@@ -24,6 +25,8 @@ echarts.use([
   AxisPointerComponent,
   CanvasRenderer,
 ]);
+
+echarts.registerTheme("pfn", { textStyle: { fontFamily: CHART_FONT } });
 
 export type ECharts = echarts.ECharts;
 
@@ -44,7 +47,7 @@ export function EChart({ option, height, onReady, onEvents, className, group }: 
 
   useEffect(() => {
     if (!el.current) return;
-    const c = echarts.init(el.current, undefined, { renderer: "canvas" });
+    const c = echarts.init(el.current, "pfn", { renderer: "canvas" });
     chart.current = c;
     if (group) {
       c.group = group;

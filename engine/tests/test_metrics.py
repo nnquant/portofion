@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from portofion_engine.calendar import align, as_returns, resample_compound, window_slice
@@ -159,6 +159,8 @@ finite_returns = st.lists(st.floats(-0.2, 0.2, allow_nan=False), min_size=5, max
 @given(finite_returns, st.floats(0.1, 10))
 @settings(max_examples=60, deadline=None)
 def test_sharpe_scale_invariant(vals, k):
+    # near-zero vol: scaling can push it across the "undefined" threshold, which is not a scale effect
+    assume(np.std(vals, ddof=1) > 1e-9)
     r = s(vals)
     a, b = summary(r)["sharpe"], summary(r * k)["sharpe"]
     if a is None:

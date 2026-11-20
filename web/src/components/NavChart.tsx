@@ -146,7 +146,6 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
     const fmtNav = (v: number) => v.toFixed(4);
     return {
       animation: false,
-      textStyle: { fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
       legend:
         series.length > 1
           ? {

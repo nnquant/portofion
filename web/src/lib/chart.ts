@@ -2,9 +2,10 @@ import type { Palette } from "./colors";
 import type { Num } from "./types";
 
 export const AXIS_FONT = 11;
+export const CHART_FONT = '"Noto Sans Variable", "Noto Sans", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif';
 
 export function baseText(p: Palette) {
-  return { color: p.ink2, fontSize: AXIS_FONT, fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" };
+  return { color: p.ink2, fontSize: AXIS_FONT, fontFamily: CHART_FONT };
 }
 
 export function catAxis(p: Palette, dates: string[], gridIndex = 0, showLabels = true) {

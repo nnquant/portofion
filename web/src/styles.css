@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --font-sans: "Noto Sans Variable", "Noto Sans", "Noto Sans SC", "Microsoft YaHei UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
   --color-surface: var(--surface-1);
   --color-plane: var(--plane);
