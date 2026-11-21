@@ -157,6 +157,42 @@ export function zoom(xAxisIndex: number[] | number, start = 0) {
   ];
 }
 
+/** Room a range selector takes under the plots. */
+export const RANGE_H = 44;
+
+/**
+ * Range selector under the plots: the whole history in miniature with draggable ends, and dragging
+ * across it picks a new window. It stays in the option while hidden so charts linked by `group` keep
+ * following it. Inset from the plot so the dates beside its handles fit.
+ */
+export function rangeZoom(p: Palette, show: boolean, top: number, xAxisIndex: number[] | number, extra: object = {}) {
+  return {
+    id: "range",
+    type: "slider" as const,
+    show,
+    xAxisIndex,
+    filterMode: "filter" as const,
+    top: top + 6,
+    height: 22,
+    left: 76,
+    right: 76,
+    borderColor: p.edge,
+    borderRadius: 3,
+    backgroundColor: "transparent",
+    fillerColor: p.sel,
+    dataBackground: { lineStyle: { color: p.muted, width: 1, opacity: 0.6 }, areaStyle: { color: p.muted, opacity: 0.1 } },
+    selectedDataBackground: { lineStyle: { color: p.series[0], width: 1 }, areaStyle: { color: p.series[0], opacity: 0.14 } },
+    handleStyle: { color: p.surface, borderColor: p.muted },
+    moveHandleSize: 6,
+    moveHandleStyle: { color: p.edge, opacity: 1 },
+    brushStyle: { color: p.series[0], opacity: 0.15 },
+    handleLabel: { show: true },
+    textStyle: { color: p.ink2, fontSize: AXIS_FONT },
+    emphasis: { handleLabel: { show: true }, handleStyle: { borderColor: p.ink2 }, moveHandleStyle: { color: p.muted, opacity: 1 } },
+    ...extra,
+  };
+}
+
 /** One-line legend that pages instead of wrapping over the plot. */
 export function legend(p: Palette, extra: object = {}) {
   return {

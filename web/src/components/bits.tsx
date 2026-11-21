@@ -84,6 +84,18 @@ export function Seg<T extends string>({ value, options, onChange }: { value: T; 
   );
 }
 
+/** Shows or hides a chart's date range selector. */
+export function RangeToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button className="btn btn-icon" aria-pressed={on} title="Date range" onClick={() => onChange(!on)}>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" strokeLinecap="round">
+        <rect x="0.75" y="3.75" width="14.5" height="4.5" rx="1" strokeWidth="1.2" opacity="0.55" />
+        <path d="M5 1.5v9M11 1.5v9" strokeWidth="1.7" />
+      </svg>
+    </button>
+  );
+}
+
 export function Popover({ button, children, align = "left" }: { button: React.ReactNode; children: React.ReactNode; align?: "left" | "right" }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

@@ -14,6 +14,7 @@ export interface Palette {
   grid: string;
   edge: string;
   surface: string;
+  sel: string;
   up: string;
   down: string;
   dark: boolean;
@@ -28,6 +29,7 @@ function read(): Palette {
     grid: readVar("--grid"),
     edge: readVar("--edge"),
     surface: readVar("--surface-1"),
+    sel: readVar("--sel"),
     up: readVar("--red"),
     down: readVar("--green"),
     dark: window.matchMedia("(prefers-color-scheme: dark)").matches,

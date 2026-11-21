@@ -32,6 +32,17 @@ echarts.registerTheme("pfn", { textStyle: { fontFamily: CHART_FONT } });
 
 export type ECharts = echarts.ECharts;
 
+/**
+ * ECharts keeps only one of left/right on a legend (6.1 does so for scroll legends too), so a paging
+ * legend given both runs to the right edge. Set the width they imply instead, refitted on resize.
+ */
+function fitLegends(c: echarts.ECharts, option: EChartsCoreOption) {
+  const ls = [option.legend].flat() as ({ type?: string; left?: unknown; right?: unknown } | undefined)[];
+  const bounded = (l: (typeof ls)[number]) => l?.type === "scroll" && typeof l.left === "number" && typeof l.right === "number";
+  if (!ls.some(bounded)) return;
+  c.setOption({ legend: ls.map((l) => (bounded(l) ? { width: Math.max(0, c.getWidth() - (l!.left as number) - (l!.right as number)) } : {})) }, { lazyUpdate: true });
+}
+
 interface Props {
   option: EChartsCoreOption;
   height: number | string;
@@ -46,6 +57,8 @@ export function EChart({ option, height, onReady, onEvents, className, group }: 
   const chart = useRef<echarts.ECharts | null>(null);
   const events = useRef(onEvents);
   events.current = onEvents;
+  const opt = useRef(option);
+  opt.current = option;
 
   useEffect(() => {
     if (!el.current) return;
@@ -55,7 +68,10 @@ export function EChart({ option, height, onReady, onEvents, className, group }: 
       c.group = group;
       echarts.connect(group);
     }
-    const ro = new ResizeObserver(() => c.resize());
+    const ro = new ResizeObserver(() => {
+      c.resize();
+      fitLegends(c, opt.current);
+    });
     ro.observe(el.current);
     onReady?.(c);
     return () => {
@@ -67,7 +83,10 @@ export function EChart({ option, height, onReady, onEvents, className, group }: 
   }, []);
 
   useEffect(() => {
-    chart.current?.setOption(option, { notMerge: true, lazyUpdate: true });
+    const c = chart.current;
+    if (!c) return;
+    c.setOption(option, { notMerge: true, lazyUpdate: true });
+    fitLegends(c, option);
   }, [option]);
 
   useEffect(() => {

@@ -1,10 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { AXIS_FONT, catAxis, drawdownFrom, extentOf, linAxisFit, logAxisFit, navFmt, navFmtFor, navFrom, pctFmt, tooltip, valAxis } from "../lib/chart";
+import { AXIS_FONT, catAxis, drawdownFrom, extentOf, legend, linAxisFit, logAxisFit, navFmt, navFmtFor, navFrom, pctFmt, RANGE_H, rangeZoom, tooltip, valAxis } from "../lib/chart";
 import type { Palette } from "../lib/colors";
 import { useWs } from "../lib/ctx";
 import type { Num } from "../lib/types";
 import { EChart, type ECharts } from "./EChart";
-import { Seg } from "./bits";
+import { RangeToggle, Seg } from "./bits";
 
 export interface NavSeries {
   key: string;
@@ -87,6 +87,7 @@ function extraAxis(p: Palette, e: ExtraPanel, i: number) {
 export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras = [], extraHeight = 76, markers = [], toolbar, initialStart, group }: Props) {
   const { palette: p } = useWs();
   const [log, setLog] = useState(false);
+  const [range, setRange] = useState(false);
   const chartRef = useRef<ECharts | null>(null);
   const many = series.length > 4;
   const right = many || series.length < 2 ? 16 : 96;
@@ -99,6 +100,8 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
   // visible window as category indexes; kept across Linear/Log and overlay changes, reset with new dates
   const win = useRef({ from: from0, to: dates.length - 1, dates });
   if (win.current.dates !== dates) win.current = { from: from0, to: dates.length - 1, dates };
+
+  const base = PAD_TOP + navHeight + GAP + ddHeight + extras.length * (XGAP + extraHeight) + BOTTOM;
 
   const option = useMemo(() => {
     const { from, to } = win.current;
@@ -174,34 +177,33 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
       lineStyle: { width: 1, color: e.color },
       itemStyle: { color: e.color },
     }));
+    // the selector previews its first target series: the first curve over its whole life, not rebased
+    // and drawn invisibly
+    const shadow =
+      range && series.length
+        ? [{ id: "shadow", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: navFrom(series[0].returns), silent: true, showSymbol: false, lineStyle: { opacity: 0 }, tooltip: { show: false }, z: 0 }]
+        : [];
+    const axes = grids.map((_, i) => i);
     const fmtNav = (v: number) => v.toFixed(4);
     return {
       animation: false,
-      legend:
-        series.length > 1
-          ? {
-              top: 4,
-              left: 48,
-              icon: "roundRect",
-              itemWidth: 12,
-              itemHeight: 3,
-              itemGap: 14,
-              textStyle: { color: p.ink2, fontSize: AXIS_FONT },
-              data: series.map((s) => s.name),
-            }
-          : undefined,
+      // pages rather than running under the toolbar
+      legend: series.length > 1 ? legend(p, { top: 4, left: 48, right: 190, data: series.map((s) => s.name) }) : undefined,
       grid: grids,
       xAxis: xAxes,
       yAxis: yAxes,
       axisPointer: { link: [{ xAxisIndex: "all" }] },
       // "filter" so every panel's y range fits the zoomed window
-      dataZoom: [{ type: "inside", xAxisIndex: grids.map((_, i) => i), filterMode: "filter", minValueSpan: 10, startValue: from, endValue: to }],
+      dataZoom: [
+        { id: "in", type: "inside", xAxisIndex: axes, filterMode: "filter", minValueSpan: 10, startValue: from, endValue: to },
+        rangeZoom(p, range, base, axes, { minValueSpan: 10, startValue: from, endValue: to }),
+      ],
       tooltip: tooltip(p, (params: any[]) => {
         if (!params?.length) return "";
         const ax = params[0].axisIndex ?? params[0].componentIndex;
         const head = `<div style="color:${p.muted};margin-bottom:2px">${params[0].axisValue}</div>`;
         const rows = params
-          .filter((x) => x.value !== null && x.value !== undefined && x.value !== "-")
+          .filter((x) => x.seriesId !== "shadow" && x.value !== null && x.value !== undefined && x.value !== "-")
           .map((x) => {
             const isDd = x.seriesId?.startsWith("dd:");
             const isNav = x.seriesId?.startsWith("nav:");
@@ -213,11 +215,11 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
         void ax;
         return head + rows;
       }),
-      series: [...navSeries, ...ddSeries, ...extraSeries],
+      series: [...shadow, ...navSeries, ...ddSeries, ...extraSeries],
     };
-  }, [dates, series, extras, navHeight, ddHeight, extraHeight, markers, log, p, many, right, from0]);
+  }, [dates, series, extras, navHeight, ddHeight, extraHeight, markers, log, range, base, p, many, right, from0]);
 
-  const total = PAD_TOP + navHeight + GAP + ddHeight + extras.length * (XGAP + extraHeight) + BOTTOM;
+  const total = base + (range ? RANGE_H : 0);
 
   const onZoom = (_: unknown, chart: ECharts) => {
     const opt = chart.getOption() as any;
@@ -244,6 +246,7 @@ export function NavChart({ dates, series, navHeight = 300, ddHeight = 90, extras
       <div className="absolute right-2 top-0.5 z-10 flex items-center gap-2">
         {toolbar}
         <Seg value={log ? "log" : "lin"} options={[["lin", "Linear"], ["log", "Log"]]} onChange={(v) => setLog(v === "log")} />
+        <RangeToggle on={range} onChange={setRange} />
         <button className="btn" title="Reset zoom" onClick={() => chartRef.current?.dispatchAction({ type: "dataZoom", start: 0, end: 100 })}>
           ⟲
         </button>

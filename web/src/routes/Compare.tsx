@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ErrorLine, Seg } from "../components/bits";
-import { EChart } from "../components/EChart";
 import { NavChart, type NavSeries } from "../components/NavChart";
+import { RangeChart } from "../components/RangeChart";
 import { RefPicker } from "../components/RefPicker";
 import { CorrMatrix, MetricsTable } from "../components/tables";
 import { api, qs, ws as wsPath } from "../lib/api";
@@ -78,8 +78,8 @@ export function Compare() {
     return {
       animation: false,
       grid: [
-        { left: 44, right: 12, top: 10, height: 120 },
-        { left: 44, right: 12, top: 160, height: 100 },
+        { left: 44, right: 12, top: 32, height: 120 },
+        { left: 44, right: 12, top: 182, height: 100 },
       ],
       xAxis: [catAxis(p, d.dates, 0, false), catAxis(p, d.dates, 1, true)],
       yAxis: [
@@ -158,7 +158,7 @@ export function Compare() {
                 <div className="card overflow-auto">
                   <CorrMatrix keys={d.corr.keys} corr={d.corr.corr} n={d.corr.n} colors={Object.fromEntries(d.keys.map((k) => [k, color(k)]))} />
                 </div>
-                <div className="card p-2">{rollOpt && <EChart option={rollOpt} height={290} group={`cmp:${refs.join()}`} />}</div>
+                <div className="card p-2">{rollOpt && <RangeChart option={rollOpt} height={312} group={`cmp:${refs.join()}`} />}</div>
               </div>
             </div>
           </div>

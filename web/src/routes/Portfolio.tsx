@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ErrorLine } from "../components/bits";
-import { EChart } from "../components/EChart";
+import { RangeChart } from "../components/RangeChart";
 import { NavChart } from "../components/NavChart";
 import { RefPicker } from "../components/RefPicker";
 import { DrawdownTable, MetricsTable, MonthlyHeatmap } from "../components/tables";
@@ -133,8 +133,8 @@ export function PortfolioPage() {
     if (cashMax > 1e-6) series.push({ ...line("cash", w.series.cash, p.grid), stack: "w", areaStyle: { color: p.grid, opacity: 1 }, lineStyle: { width: 0 }, step: "end" });
     return {
       animation: false,
-      grid: { left: 44, right: 12, top: 26, bottom: 22 },
-      legend: legend(p),
+      grid: { left: 44, right: 12, top: 32, bottom: 22 },
+      legend: legend(p, { right: 40 }),
       xAxis: catAxis(p, w.dates),
       yAxis: valAxis(p, 0, pctFmt(0), gross <= 1.0001 ? { scale: false, min: 0, max: 1, interval: 0.25 } : { scale: false, splitNumber: 4 }),
       dataZoom: [{ type: "inside", filterMode: "filter" }],
@@ -158,8 +158,8 @@ export function PortfolioPage() {
     });
     return {
       animation: false,
-      grid: { left: 44, right: 12, top: 26, bottom: 22 },
-      legend: legend(p),
+      grid: { left: 44, right: 12, top: 32, bottom: 22 },
+      legend: legend(p, { right: 40 }),
       xAxis: catAxis(p, md.dates),
       yAxis: valAxis(p, 0, navFmt, { splitNumber: 4 }),
       dataZoom: [{ type: "inside", filterMode: "filter" }],
@@ -382,8 +382,8 @@ export function PortfolioPage() {
               <NavChart dates={res.dates} series={[{ key: "pf", name: form.slug || "portfolio", color: p.series[0], returns: res.returns, width: 2 }]} navHeight={260} ddHeight={80} />
             </div>
             <div className="grid gap-3 xl:grid-cols-2">
-              <div className="card p-2">{membersOpt && <EChart option={membersOpt} height={260} />}</div>
-              <div className="card p-2">{weightsOpt && <EChart option={weightsOpt} height={260} />}</div>
+              <div className="card p-2">{membersOpt && <RangeChart option={membersOpt} height={266} />}</div>
+              <div className="card p-2">{weightsOpt && <RangeChart option={weightsOpt} height={266} shadow={false} />}</div>
             </div>
             <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)]">
               <div className="card overflow-auto">
